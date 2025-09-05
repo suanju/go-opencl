@@ -1,6 +1,7 @@
 package main
 
 /*
+#cgo CFLAGS: -DCL_TARGET_OPENCL_VERSION=300
 #cgo LDFLAGS: -lOpenCL
 #include <CL/cl.h>
 #include <stdlib.h>
