@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "cl.h": "c",
+        "cl_version.h": "c",
+        "cl_platform.h": "c"
+    }
+}
