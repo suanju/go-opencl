@@ -1,6 +1,7 @@
 # go-opencl
 
 一个功能完整的Go语言OpenCL绑定库，提供高性能GPU计算能力。支持OpenCL 3.0+标准
+
 ## ✨ 特性
 
 - 🚀 **完整的OpenCL 3.0+支持** - 支持最新的OpenCL标准
@@ -21,15 +22,18 @@ go get github.com/suanju/go-opencl
 ### 环境要求
 
 #### Windows
+
 - NVIDIA GPU驱动（支持CUDA）
 - AMD GPU驱动（支持OpenCL）
 - Intel GPU驱动（支持OpenCL）
 
 #### Linux
+
 - 相应的GPU驱动
 - OpenCL运行时库
 
 #### macOS
+
 - 系统自带OpenCL支持
 
 ### 基础示例
@@ -40,7 +44,7 @@ package main
 import (
     "fmt"
     "unsafe"
-    
+
     "github.com/suanju/go-opencl/cl"
 )
 
@@ -50,81 +54,96 @@ func main() {
     if err != nil {
         panic(err)
     }
-    
+
     devices, err := cl.GetDeviceIDs(platforms[0], cl.DeviceTypeGPU)
     if err != nil {
         panic(err)
     }
-    
+
     // 创建上下文
     ctx, err := cl.CreateContext(platforms[0], devices, nil)
     if err != nil {
         panic(err)
     }
     defer cl.ReleaseContext(ctx)
-    
+
     // 创建命令队列
     queue, err := cl.CreateCommandQueue(ctx, devices[0], 0)
     if err != nil {
         panic(err)
     }
     defer cl.ReleaseCommandQueue(queue)
-    
-    // 创建缓冲区
+
+    // 输入数据
     data := []float32{1, 2, 3, 4, 5}
-    buffer, err := cl.CreateBuffer(ctx, cl.MemReadWrite, 
-        cl.Size(len(data)*4), unsafe.Pointer(&data[0]))
+
+    // 创建缓冲区（不直接传 host pointer）
+    buffer, err := cl.CreateBuffer(ctx, cl.MemReadWrite, cl.Size(len(data)*4), nil)
     if err != nil {
         panic(err)
     }
     defer cl.ReleaseMemObject(buffer)
-    
+
+    // 把数据写到 GPU buffer
+    _, err = cl.EnqueueWriteBuffer(queue, buffer, cl.Bool(1), 0,
+        cl.Size(len(data)*4), unsafe.Pointer(&data[0]), nil)
+    if err != nil {
+        panic(err)
+    }
+
     // 创建程序
     source := `
     __kernel void square(__global float* data) {
         int gid = get_global_id(0);
         data[gid] = data[gid] * data[gid];
     }`
-    
+
     program, err := cl.CreateProgramWithSource(ctx, 1, []string{source}, nil)
     if err != nil {
         panic(err)
     }
     defer cl.ReleaseProgram(program)
-    
+
     // 构建程序
     err = cl.BuildProgram(program, devices, "", nil, nil)
     if err != nil {
+        // 打印编译日志
+        log, _ := cl.GetProgramBuildInfo(program, devices[0], 0x1183)
+        fmt.Println("Build Log:", log)
         panic(err)
     }
-    
+
     // 创建内核
     kernel, err := cl.CreateKernel(program, "square")
     if err != nil {
         panic(err)
     }
     defer cl.ReleaseKernel(kernel)
-    
+
     // 设置内核参数
-    cl.SetKernelArg(kernel, 0, cl.Size(unsafe.Sizeof(buffer)), 
-        unsafe.Pointer(&buffer))
-    
-    // 执行内核
-    err = cl.EnqueueNDRangeKernel(queue, kernel, cl.UInt(1), nil, 
-        []cl.Size{cl.Size(len(data))}, nil, nil, nil)
+    err = cl.SetKernelArg(kernel, 0, cl.Size(unsafe.Sizeof(buffer)), unsafe.Pointer(&buffer))
     if err != nil {
         panic(err)
     }
-    
+
+    // 执行内核
+    err = cl.EnqueueNDRangeKernel(queue, kernel, 1, nil, []cl.Size{cl.Size(len(data))}, nil, nil, nil)
+    if err != nil {
+        panic(err)
+    }
+
+    // 确保执行完成
+    cl.Finish(queue)
+
     // 读取结果
     result := make([]float32, len(data))
-    _, err = cl.EnqueueReadBuffer(queue, buffer, cl.Bool(1), 0, 
-        cl.Size(len(data)*4), unsafe.Pointer(&result[0]), nil)
+    _, err = cl.EnqueueReadBuffer(queue, buffer, cl.Bool(1), 0,
+        cl.Size(len(result)*4), unsafe.Pointer(&result[0]), nil)
     if err != nil {
         panic(err)
     }
     
-    fmt.Println("结果:", result) // 输出: [1 4 9 16 25]
+    fmt.Println("结果:", result) // 预期: [1 4 9 16 25]
 }
 ```
 
@@ -264,24 +283,30 @@ err = cl.SafeExecute("operation", func() error {
 项目包含多个实用示例：
 
 ### 1. 基础示例
+
 ```bash
 cd example
 go run example.go
 ```
+
 展示OpenCL基础功能：平台查询、设备管理、缓冲区操作、程序构建。
 
 ### 2. 矩阵乘法性能测试
+
 ```bash
 cd example/matrix_multiply
 go run main.go
 ```
+
 比较CPU和GPU的矩阵乘法性能，测试不同矩阵大小（256x256 到 2048x2048）。
 
 ### 3. 向量运算性能测试
+
 ```bash
 cd example/vector_operations
 go run main.go
 ```
+
 比较CPU和GPU的向量运算性能，执行复杂运算：`c = a * b + sin(a) + cos(b)`。
 
 ## 🔧 高级用法
