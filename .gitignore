@@ -1,2 +1,35 @@
-.vscode
+# Binaries for programs and plugins
 *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Output of the go build command
+*.out
+
+# Go build cache & modules
+/bin/
+/build/
+/dist/
+*.log
+
+# Dependency directories (managed by go mod)
+vendor/
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Go coverage files
+*.cover
+*.cov
+coverage.out

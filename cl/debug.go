@@ -2,7 +2,8 @@ package cl
 
 import (
 	"fmt"
-	"opencl/internal"
+
+	"github.com/suanju/go-opencl/internal"
 )
 
 var dbg = internal.NewDebugHelper()

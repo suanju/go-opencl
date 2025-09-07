@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"math"
-	"opencl/cl"
 	"os"
 	"unsafe"
+
+	"github.com/suanju/go-opencl/cl"
 )
 
 func main() {
@@ -42,11 +43,6 @@ func main() {
 	// task demo (示例使用 NDRange 替代 clEnqueueTask)
 	if err := taskDemo(ctx, devices[0]); err != nil {
 		fmt.Println("taskDemo 错误:", err)
-	}
-
-	// debug / error demo
-	if err := debugDemo(ctx, devices[0]); err != nil {
-		fmt.Println("debugDemo 错误:", err)
 	}
 
 	fmt.Println("\n=== 示例完成 ===")
@@ -153,7 +149,7 @@ func bufferDemo(ctx cl.Context, device cl.DeviceID) error {
 	}
 	cl.Finish(queue)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if data[i] != out[i] {
 			return fmt.Errorf("data mismatch at %d: got %v want %v", i, out[i], data[i])
 		}
@@ -221,7 +217,7 @@ func taskDemo(ctx cl.Context, device cl.DeviceID) error {
 	a := make([]float32, n)
 	b := make([]float32, n)
 	c := make([]float32, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		a[i] = float32(i)
 		b[i] = float32(i * 2)
 	}
@@ -299,63 +295,12 @@ __kernel void vector_add(__global const float* a, __global const float* b, __glo
 
 	// verify (浮点比较使用 eps)
 	eps := 1e-6
-	for i := 0; i < n; i++ {
+	for i := range n {
 		expected := float64(a[i] + b[i])
 		if math.Abs(float64(c[i])-expected) > eps {
 			return fmt.Errorf("result mismatch at %d: got %v want %v", i, c[i], expected)
 		}
 	}
 	fmt.Println("  ✓ taskDemo: kernel result verified")
-	return nil
-}
-
-// debugDemo: 演示错误日志/构建错误捕获/Validate 等（简洁）
-func debugDemo(ctx cl.Context, device cl.DeviceID) error {
-	fmt.Println("\n== debugDemo ==")
-	cl.EnableDebugLogging()
-	defer cl.DisableDebugLogging()
-
-	// 构造有语法错误的程序以示范获取构建日志
-	invalid := `
-__kernel void bad(__global const float* a) {
-    int gid = get_global_id(0)
-    // missing semicolon above
-    a[gid] = a[gid];
-}
-`
-	prog, err := cl.CreateProgramWithSource(ctx, 1, []string{invalid}, nil)
-	if err != nil {
-		return fmt.Errorf("CreateProgramWithSource: %w", err)
-	}
-	defer cl.ReleaseProgram(prog)
-
-	if err := cl.BuildProgram(prog, []cl.DeviceID{device}, "", nil, nil); err == nil {
-		// unexpectedly succeeded
-		return fmt.Errorf("expected build to fail but it succeeded")
-	} else {
-		// try get detailed build info
-		if bi, e := cl.GetDetailedBuildInfo(prog, device); e == nil {
-			fmt.Printf("  build status: %s\n", cl.BuildStatusString(bi.Status))
-			if bi.HasBuildErrors() {
-				fmt.Println("  build log:\n", bi.Log)
-			}
-		}
-	}
-
-	// ValidateContext / ValidateDevice 示例（轻量）
-	if err := cl.ValidateContext(ctx); err != nil {
-		fmt.Println("  ValidateContext:", err)
-	} else {
-		fmt.Println("  ✓ ValidateContext ok")
-	}
-	if err := cl.ValidateDevice(device); err != nil {
-		fmt.Println("  ValidateDevice:", err)
-	} else {
-		fmt.Println("  ✓ ValidateDevice ok")
-	}
-
-	// 打印并清空日志摘要
-	fmt.Println("  ErrorSummary:\n", cl.GetErrorSummary())
-	cl.ClearErrorLog()
 	return nil
 }
